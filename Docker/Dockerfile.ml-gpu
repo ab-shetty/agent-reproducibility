@@ -56,15 +56,8 @@ RUN pip install --no-cache-dir \
     # HuggingFace ecosystem (used by many 2023-24 papers)
     transformers accelerate datasets tokenizers \
     diffusers peft trl \
-    # Experiment tracking / serialisation
-    wandb mlflow \
     # Notebooks
-    jupyter jupyterlab ipywidgets \
-    # Misc utilities used widely
-    scikit-learn einops timm \
-    tqdm rich click \
-    # Flash-Attention build deps (optional – uncomment if needed)
-    # ninja packaging
+    jupyter jupyterlab ipywidgets
 
 # ── Non-root user ────────────────────────────────────────────
 ARG USERNAME=researcher
