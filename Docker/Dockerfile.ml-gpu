@@ -1,0 +1,94 @@
+# ============================================================
+# Image 1: ML / GPU
+# Base: NVIDIA CUDA 12.1 + cuDNN 8 on Ubuntu 22.04
+#
+# Covers most 2023-2024 ML paper code (PyTorch ≥ 2.0).
+# Users can pip/conda install additional packages at runtime.
+# ============================================================
+
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+
+# ── System metadata ─────────────────────────────────────────
+LABEL maintainer="berkeley-mids"
+LABEL description="ML research environment: CUDA 12.1, cuDNN 8, Python 3.11, PyTorch 2"
+
+# ── Prevent interactive prompts during apt ──────────────────
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# ── System packages ─────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Core utilities
+    wget curl git vim nano less \
+    ca-certificates gnupg \
+    # Build tools (needed by some pip packages)
+    build-essential gcc g++ make cmake \
+    # Compression / archive
+    zip unzip tar \
+    # Runtime libs commonly needed by ML code
+    libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 \
+    # Sudo for runtime installs
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Miniforge (conda + mamba, Python 3.11) ──────────────────
+ENV CONDA_DIR=/opt/conda
+RUN wget -qO /tmp/miniforge.sh \
+    "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh" \
+    && bash /tmp/miniforge.sh -b -p "$CONDA_DIR" \
+    && rm /tmp/miniforge.sh \
+    && $CONDA_DIR/bin/conda install -y python=3.11 \
+    && $CONDA_DIR/bin/conda clean -afy
+
+ENV PATH="$CONDA_DIR/bin:$PATH"
+
+# ── PyTorch (CUDA 12.1 wheel) ────────────────────────────────
+# Pin to a specific PyTorch version here if reproducibility matters.
+# --extra-index-url picks up the CUDA-enabled wheel automatically.
+RUN pip install --no-cache-dir \
+    torch torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/cu121
+
+# ── Common ML / scientific stack ────────────────────────────
+RUN pip install --no-cache-dir \
+    # Core scientific
+    numpy scipy pandas matplotlib seaborn \
+    # HuggingFace ecosystem (used by many 2023-24 papers)
+    transformers accelerate datasets tokenizers \
+    diffusers peft trl \
+    # Experiment tracking / serialisation
+    wandb mlflow \
+    # Notebooks
+    jupyter jupyterlab ipywidgets \
+    # Misc utilities used widely
+    scikit-learn einops timm \
+    tqdm rich click \
+    # Flash-Attention build deps (optional – uncomment if needed)
+    # ninja packaging
+
+# ── Non-root user ────────────────────────────────────────────
+ARG USERNAME=researcher
+ARG UID=1000
+RUN useradd -m -u $UID -s /bin/bash $USERNAME \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+USER $USERNAME
+WORKDIR /home/$USERNAME
+
+# ── Environment variables ────────────────────────────────────
+ENV PATH="$CONDA_DIR/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+# Makes HuggingFace cache go to a predictable location inside
+# the container (mount a volume here for persistence)
+ENV HF_HOME=/home/$USERNAME/.cache/huggingface
+ENV TORCH_HOME=/home/$USERNAME/.cache/torch
+
+# ── Build and run ────────────────────────────────────────────
+# Build:
+#   docker build -f Dockerfile.ml-gpu -t ml-gpu:latest .
+#
+# Run with GPU:
+#   docker run --gpus all -it -v $(pwd):/home/researcher/work ml-gpu:latest
+#
+# Run without GPU (CPU-only testing):
+#   docker run -it -v $(pwd):/home/researcher/work ml-gpu:latest
