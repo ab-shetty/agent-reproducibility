@@ -2,7 +2,7 @@
 # Image 1: ML / GPU
 # Base: NVIDIA CUDA 12.1 + cuDNN 8 on Ubuntu 22.04
 #
-# Covers most 2023-2024 ML paper code (PyTorch ≥ 2.0).
+# Covers most 2023-2024 ML paper code (PyTorch ≥ 2.0)
 # Users can pip/conda install additional packages at runtime.
 # ============================================================
 
