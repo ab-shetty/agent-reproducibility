@@ -1,0 +1,93 @@
+# ============================================================
+# Image 2: Python + R
+# Base: Ubuntu 22.04
+#
+# Includes: Python 3.11, R 4.x.
+# Users can pip install / install.packages() at runtime.
+# ============================================================
+
+FROM ubuntu:22.04
+
+# ── System metadata ─────────────────────────────────────────
+LABEL maintainer="berkeley-mids"
+LABEL description="Non-ML Research environment: Python 3.11, R 4.x"
+
+# ── Prevent interactive prompts during apt ──────────────────
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# ── System packages ─────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Core utilities
+    wget curl git vim nano less \
+    ca-certificates gnupg software-properties-common \
+    # Build tools
+    build-essential gcc g++ make gfortran \
+    # Compression / archive
+    zip unzip tar \
+    # Python 3.11
+    python3.11 python3.11-dev python3.11-venv python3-pip \
+    # R runtime dependencies
+    libcurl4-openssl-dev libssl-dev libxml2-dev \
+    libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
+    libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
+    liblapack-dev libopenblas-dev \
+    # Sudo for runtime installs
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Python: make python3.11 the default ──────────────────────
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    && update-alternatives --install /usr/bin/python  python  /usr/bin/python3.11 1 \
+    && python3 -m pip install --upgrade pip
+
+# ── R 4.x from CRAN PPA ──────────────────────────────────────
+RUN wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc \
+    | gpg --dearmor -o /usr/share/keyrings/r-project.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/r-project.gpg] https://cloud.r-project.org/bin/linux/ubuntu jammy-cran40/" \
+    > /etc/apt/sources.list.d/r-project.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends r-base r-base-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── R packages ───────────────────────────────────────────────
+RUN Rscript -e " \
+    install.packages(c( \
+        # Tidyverse stack \
+        'tidyverse', 'haven', 'readxl', 'janitor', \
+        # Output / tables \
+        'stargazer', 'modelsummary', 'gt', 'knitr', 'rmarkdown', \
+        # Misc \
+        'ggplot2', 'patchwork', 'data.table', 'Rcpp' \
+    ), repos='https://cloud.r-project.org', Ncpus=4) \
+"
+
+# ── Python scientific stack ──────────────────────────────────
+RUN pip install --no-cache-dir \
+    # Core scientific
+    numpy scipy pandas matplotlib seaborn \
+    # Stats
+    statsmodels \
+    # Data I/O
+    pyreadstat openpyxl xlrd \
+    # Notebooks
+    jupyter jupyterlab ipywidgets
+
+# ── Non-root user ────────────────────────────────────────────
+ARG USERNAME=researcher
+ARG UID=1000
+RUN useradd -m -u $UID -s /bin/bash $USERNAME \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+USER $USERNAME
+WORKDIR /home/$USERNAME
+
+# ── Environment variables ────────────────────────────────────
+ENV PYTHONUNBUFFERED=1
+
+# ── Build and run ────────────────────────────────────────────
+# Build:
+#   docker build --build-arg UID=$(id -u) -f Dockerfile.non-ml -t ashetty21/non-ml:latest .
+#
+# Run:
+#   docker run -it -v $(pwd):/home/researcher/work ashetty21/non-ml:latest
