@@ -35,11 +35,12 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _attach_tool_call(messages: list, tc: ToolCall) -> None:
+def _attach_tool_call(messages: list, tc: ToolCall, timestamp: str | None = None) -> None:
     if messages and isinstance(messages[-1], AssistantMessage):
         messages[-1].tool_calls = (messages[-1].tool_calls or []) + [tc]
     else:
-        messages.append(AssistantMessage(content="[tool call]", tool_calls=[tc]))
+        meta = {"timestamp": timestamp} if timestamp else None
+        messages.append(AssistantMessage(content="[tool call]", tool_calls=[tc], metadata=meta))
 
 
 def convert(path: Path, tag: str | None = None) -> AgentRun:
@@ -68,6 +69,8 @@ def convert(path: Path, tag: str | None = None) -> AgentRun:
         if not isinstance(payload, dict):
             continue
         ptype = payload.get("type")
+        ts = rec.get("timestamp")
+        meta = {"timestamp": ts} if ts else None
 
         if rtype == "response_item" and ptype == "message":
             role = payload.get("role")
@@ -81,11 +84,11 @@ def convert(path: Path, tag: str | None = None) -> AgentRun:
                 text = str(raw_content)
 
             if role == "developer":
-                messages.append(SystemMessage(content=text))
+                messages.append(SystemMessage(content=text, metadata=meta))
             elif role == "user":
-                messages.append(UserMessage(content=text))
+                messages.append(UserMessage(content=text, metadata=meta))
             elif role == "assistant":
-                messages.append(AssistantMessage(content=text))
+                messages.append(AssistantMessage(content=text, metadata=meta))
 
         elif rtype == "response_item" and ptype == "reasoning":
             pass  # encrypted — omitted
@@ -100,7 +103,7 @@ def convert(path: Path, tag: str | None = None) -> AgentRun:
                     args = {"value": args}
             except json.JSONDecodeError:
                 args = {"raw_arguments": payload.get("arguments", "")}
-            _attach_tool_call(messages, ToolCall(id=call_id, function=name, arguments=args, type="function"))
+            _attach_tool_call(messages, ToolCall(id=call_id, function=name, arguments=args, type="function"), timestamp=ts)
 
         elif rtype == "response_item" and ptype == "function_call_output":
             call_id = payload.get("call_id") or f"tool-out-line-{i}"
@@ -111,6 +114,7 @@ def convert(path: Path, tag: str | None = None) -> AgentRun:
                 content=content,
                 tool_call_id=call_id,
                 function=tool_name_by_call_id.get(call_id),
+                metadata=meta,
             ))
 
         elif rtype == "response_item" and ptype == "web_search_call":
@@ -121,7 +125,7 @@ def convert(path: Path, tag: str | None = None) -> AgentRun:
                 function="web_search",
                 arguments={"status": payload.get("status"), "action": payload.get("action", {})},
                 type="function",
-            ))
+            ), timestamp=ts)
 
         elif rtype == "event_msg" and ptype == "web_search_end":
             real_id = payload.get("call_id")
@@ -130,6 +134,7 @@ def convert(path: Path, tag: str | None = None) -> AgentRun:
                 content=json.dumps({"query": payload.get("query"), "action": payload.get("action")}),
                 tool_call_id=real_id or synthetic_id,
                 function="web_search",
+                metadata=meta,
             ))
         # All other event_msg types are operational metadata — omitted
 
