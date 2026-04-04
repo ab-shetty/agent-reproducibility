@@ -72,6 +72,7 @@ RUN useradd -m -u $UID -s /bin/bash $USERNAME \
 
 USER $USERNAME
 WORKDIR /home/$USERNAME
+RUN conda init bash
 
 # ── Environment variables ────────────────────────────────────
 ENV PATH="$CONDA_DIR/bin:$PATH"

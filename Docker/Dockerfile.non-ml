@@ -2,15 +2,15 @@
 # Image 2: Python + R
 # Base: Ubuntu 22.04
 #
-# Includes: Python 3.11, R 4.x.
-# Users can pip install / install.packages() at runtime.
+# Includes: Miniforge (conda + mamba), Python 3.11, R 4.x.
+# Users can conda/pip install / install.packages() at runtime.
 # ============================================================
 
 FROM ubuntu:22.04
 
 # ── System metadata ─────────────────────────────────────────
 LABEL maintainer="berkeley-mids"
-LABEL description="Non-ML Research environment: Python 3.11, R 4.x"
+LABEL description="Non-ML Research environment: Miniforge, Python 3.11, R 4.x"
 
 # ── Prevent interactive prompts during apt ──────────────────
 ENV DEBIAN_FRONTEND=noninteractive
@@ -25,8 +25,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential gcc g++ make gfortran \
     # Compression / archive
     zip unzip tar \
-    # Python 3.11
-    python3.11 python3.11-dev python3.11-venv python3-pip \
     # R runtime dependencies
     libcurl4-openssl-dev libssl-dev libxml2-dev \
     libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
@@ -41,10 +39,16 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Python: make python3.11 the default ──────────────────────
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
-    && update-alternatives --install /usr/bin/python  python  /usr/bin/python3.11 1 \
-    && python3 -m pip install --upgrade pip
+# ── Miniforge (conda + mamba, Python 3.11) ──────────────────
+ENV CONDA_DIR=/opt/conda
+RUN wget -qO /tmp/miniforge.sh \
+    "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh" \
+    && bash /tmp/miniforge.sh -b -p "$CONDA_DIR" \
+    && rm /tmp/miniforge.sh \
+    && $CONDA_DIR/bin/conda install -y python=3.11 \
+    && $CONDA_DIR/bin/conda clean -afy
+
+ENV PATH="$CONDA_DIR/bin:$PATH"
 
 # ── R 4.x from CRAN PPA ──────────────────────────────────────
 RUN wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc \
@@ -86,8 +90,10 @@ RUN useradd -m -u $UID -s /bin/bash $USERNAME \
 
 USER $USERNAME
 WORKDIR /home/$USERNAME
+RUN conda init bash
 
 # ── Environment variables ────────────────────────────────────
+ENV PATH="$CONDA_DIR/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
 # ── Build and run ────────────────────────────────────────────
