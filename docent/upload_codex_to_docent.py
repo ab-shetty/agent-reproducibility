@@ -31,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path", type=Path, required=True, help="Path to the rollout .jsonl file.")
     parser.add_argument("--collection-name", required=True, help="Docent collection name to upload into (created if absent).")
     parser.add_argument("--dry-run", action="store_true", help="Convert and validate without uploading.")
+    parser.add_argument("--tag", help="Custom tag to attach to the run metadata.")
     return parser.parse_args()
 
 
@@ -41,7 +42,7 @@ def _attach_tool_call(messages: list, tc: ToolCall) -> None:
         messages.append(AssistantMessage(content="[tool call]", tool_calls=[tc]))
 
 
-def convert(path: Path) -> AgentRun:
+def convert(path: Path, tag: str | None = None) -> AgentRun:
     records = [json.loads(l) for l in path.open()]
 
     # --- Extract metadata from source ---
@@ -150,6 +151,7 @@ def convert(path: Path) -> AgentRun:
             "step_count": step_count,
             "cli_version": session_meta.get("cli_version"),
             "approval_policy": first_turn.get("approval_policy"),
+            **({"tag": tag} if tag is not None else {}),
         },
     )
 
@@ -171,7 +173,7 @@ def main() -> None:
         raise SystemExit(f"File not found: {args.path}")
 
     print(f"Converting {args.path.name}...")
-    agent_run = convert(args.path)
+    agent_run = convert(args.path, tag=args.tag)
     msgs = agent_run.transcripts[0].messages
     print(f"  {len(msgs)} messages, {agent_run.metadata['step_count']} tool steps")
     print(f"  model: {agent_run.metadata['model']}")
