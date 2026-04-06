@@ -56,4 +56,4 @@ jobs:
           file: ./Docker/Dockerfile.non-ml
           push: true
           tags: ashetty21/non-ml:latest
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64

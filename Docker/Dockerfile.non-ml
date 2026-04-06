@@ -42,7 +42,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 # ── Miniforge (conda + mamba, Python 3.11) ──────────────────
 ENV CONDA_DIR=/opt/conda
 RUN wget -qO /tmp/miniforge.sh \
-    "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh" \
+    "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-$(uname -m).sh" \
     && bash /tmp/miniforge.sh -b -p "$CONDA_DIR" \
     && rm /tmp/miniforge.sh \
     && $CONDA_DIR/bin/conda install -y python=3.11 \
@@ -97,8 +97,12 @@ ENV PATH="$CONDA_DIR/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
 # ── Build and run ────────────────────────────────────────────
-# Build:
-#   docker build --build-arg UID=$(id -u) -f Dockerfile.non-ml -t ashetty21/non-ml:latest .
+# Build (multi-platform, pushes directly to Dockerhub):
+#   docker buildx build --platform linux/amd64,linux/arm64 \
+#     --build-arg UID=$(id -u) \
+#     -f Dockerfile.non-ml \
+#     -t ashetty21/non-ml:latest \
+#     --push .
 #
 # Run:
 #   docker run -it -v $(pwd):/home/researcher/work ashetty21/non-ml:latest
