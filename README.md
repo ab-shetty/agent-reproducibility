@@ -37,7 +37,7 @@ python docent/upload_codex_to_docent.py \
 
 ```
 Using the script at <path to upload_codex_to_docent.py>,
-find the rollout JSONL file for the conversation about <TOPIC> (look in <directory>),
+find the rollout JSONL file for the conversation about <TOPIC>,
 then run:
 
   python <path to upload_codex_to_docent.py> \
