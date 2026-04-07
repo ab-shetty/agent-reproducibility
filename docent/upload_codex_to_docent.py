@@ -32,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--collection-name", required=True, help="Docent collection name to upload into (created if absent).")
     parser.add_argument("--dry-run", action="store_true", help="Convert and validate without uploading.")
     parser.add_argument("--tag", help="Custom tag to attach to the run metadata.")
+    parser.add_argument("--meta-sidecar", type=Path, help="Path to session metadata JSON produced by lambda-ml.sh (merges env/timing/paper info into AgentRun metadata).")
     return parser.parse_args()
 
 
@@ -182,6 +183,26 @@ def main() -> None:
     msgs = agent_run.transcripts[0].messages
     print(f"  {len(msgs)} messages, {agent_run.metadata['step_count']} tool steps")
     print(f"  model: {agent_run.metadata['model']}")
+
+    # Merge sidecar metadata if provided
+    if args.meta_sidecar:
+        sidecar_path = args.meta_sidecar.expanduser()
+        if not sidecar_path.exists():
+            raise SystemExit(f"Meta sidecar not found: {sidecar_path}")
+        sidecar = json.loads(sidecar_path.read_text())
+        agent_run.metadata.update({
+            "paper": sidecar.get("paper"),
+            "researcher": sidecar.get("researcher"),
+            "condition": sidecar.get("condition"),
+            "session_id": sidecar.get("session_id"),
+            "start_time": sidecar.get("start_time"),
+            "end_time": sidecar.get("end_time"),
+            "duration_seconds": sidecar.get("duration_seconds"),
+            "status": sidecar.get("status"),
+            "lambda_host": sidecar.get("lambda_host"),
+            "env": sidecar.get("env"),
+        })
+        print(f"  sidecar: {sidecar.get('paper')} | {sidecar.get('researcher')} | {sidecar.get('duration_seconds')}s")
 
     # Validate
     from docent.data_models.agent_run import AgentRunView

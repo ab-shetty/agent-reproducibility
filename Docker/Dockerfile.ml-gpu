@@ -83,8 +83,8 @@ ENV HF_HOME=/home/$USERNAME/.cache/huggingface
 ENV TORCH_HOME=/home/$USERNAME/.cache/torch
 
 # ── Build and run ────────────────────────────────────────────
-# Build:
-#   docker build -f Dockerfile.ml-gpu -t ml-gpu:latest .
+# Build (run from repo root):
+#   docker build -f Docker/Dockerfile.ml-gpu -t ml-gpu:latest .
 #
 # Run with GPU:
 #   docker run --gpus all -it -v $(pwd):/home/researcher/work ml-gpu:latest
