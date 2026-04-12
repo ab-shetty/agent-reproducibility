@@ -66,7 +66,13 @@ RUN pip install --no-cache-dir \
 
 # ── Docent runtime helpers ───────────────────────────────────
 RUN pip install --no-cache-dir docent-python
-COPY docent /opt/rct
+COPY docent/ /opt/rct/
+
+# ── Session entrypoint scripts (RunPod auto-start) ──────────
+COPY Docker/start-session.sh /opt/rct/start-session.sh
+COPY Docker/finish-session.sh /opt/rct/finish-session.sh
+RUN chmod +x /opt/rct/start-session.sh /opt/rct/finish-session.sh \
+    && ln -s /opt/rct/finish-session.sh /usr/local/bin/finish-session
 
 # ── Non-root user ────────────────────────────────────────────
 ARG USERNAME=researcher
@@ -74,24 +80,36 @@ ARG UID=1000
 RUN useradd -m -u $UID -s /bin/bash $USERNAME \
     && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-USER $USERNAME
-WORKDIR /home/$USERNAME
-RUN conda init bash
+# ── Auto-start session on first interactive login ────────────
+# Works for both root (RunPod default) and researcher (local/Lambda)
+RUN BASHRC_SNIPPET='# Auto-start reproducibility session on first connect\nif [ -t 0 ] && [ ! -f /tmp/.rct_session_started ]; then\n    source /opt/rct/start-session.sh\nfi' \
+    && echo -e "\n$BASHRC_SNIPPET" >> /root/.bashrc \
+    && echo -e "\n$BASHRC_SNIPPET" >> /home/$USERNAME/.bashrc
+
+WORKDIR /workspace
+RUN conda init bash \
+    && su -c "conda init bash" $USERNAME
 
 # ── Environment variables ────────────────────────────────────
 ENV PATH="$CONDA_DIR/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 # Makes HuggingFace cache go to a predictable location inside
 # the container (mount a volume here for persistence)
-ENV HF_HOME=/home/$USERNAME/.cache/huggingface
-ENV TORCH_HOME=/home/$USERNAME/.cache/torch
+ENV HF_HOME=/root/.cache/huggingface
+ENV TORCH_HOME=/root/.cache/torch
+
+# ── Default command (RunPod template: sleep infinity) ────────
+CMD ["sleep", "infinity"]
 
 # ── Build and run ────────────────────────────────────────────
-# Build (run from repo root):
+# Build (from repo root):
 #   docker build -f Docker/Dockerfile.ml-gpu -t ml-gpu:latest .
 #
-# Run with GPU:
-#   docker run --gpus all -it -v $(pwd):/home/researcher/work ml-gpu:latest
+# RunPod: set this image as template, start command "sleep infinity",
+#         set env vars PAPER_NAME, RESEARCHER, CONDITION, DOCENT_API_KEY
 #
-# Run without GPU (CPU-only testing):
-#   docker run -it -v $(pwd):/home/researcher/work ml-gpu:latest
+# Local with GPU:
+#   docker run --gpus all -it -v $(pwd):/workspace ml-gpu:latest bash
+#
+# Local CPU-only:
+#   docker run -it -v $(pwd):/workspace ml-gpu:latest bash

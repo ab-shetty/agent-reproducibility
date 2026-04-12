@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'Docker/**'
+      - 'docent/**'
 
 jobs:
   build-ml-gpu:
@@ -27,8 +28,8 @@ jobs:
       - name: Build and push ml-gpu
         uses: docker/build-push-action@v6
         with:
-          context: ./Docker
-          file: ./Docker/Dockerfile.ml-gpu
+          context: .
+          file: Docker/Dockerfile.ml-gpu
           push: true
           tags: ashetty21/ml-gpu:latest
           platforms: linux/amd64
@@ -52,8 +53,8 @@ jobs:
       - name: Build and push non-ml
         uses: docker/build-push-action@v6
         with:
-          context: ./Docker
-          file: ./Docker/Dockerfile.non-ml
+          context: .
+          file: Docker/Dockerfile.non-ml
           push: true
           tags: ashetty21/non-ml:latest
           platforms: linux/amd64,linux/arm64
