@@ -106,7 +106,7 @@ RUN BASHRC_SNIPPET='# Auto-start reproducibility session on first connect\nif [ 
 
 WORKDIR /workspace
 RUN conda init bash \
-    && su -c "conda init bash" $USERNAME
+    && su -c "$CONDA_DIR/bin/conda init bash" $USERNAME
 
 # ── Environment variables ────────────────────────────────────
 ENV PATH="$CONDA_DIR/bin:$PATH"
