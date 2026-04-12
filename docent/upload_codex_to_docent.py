@@ -199,7 +199,10 @@ def main() -> None:
             "end_time": sidecar.get("end_time"),
             "duration_seconds": sidecar.get("duration_seconds"),
             "status": sidecar.get("status"),
+            "provider": sidecar.get("provider"),
             "lambda_host": sidecar.get("lambda_host"),
+            "runpod_host": sidecar.get("runpod_host"),
+            "runpod_port": sidecar.get("runpod_port"),
             "env": sidecar.get("env"),
         })
         print(f"  sidecar: {sidecar.get('paper')} | {sidecar.get('researcher')} | {sidecar.get('duration_seconds')}s")

@@ -18,8 +18,8 @@ if [ -f "$SCRIPT_DIR/../.env" ]; then
   set +a
 fi
 LOG_DIR="$SCRIPT_DIR/../logs"
-DOCKER_IMAGE="ashetty21/non-ml:latest"
-CONTAINER_NAME="rct-eval"
+DOCKER_IMAGE="${NON_ML_DOCKER_IMAGE:-ashetty21/non-ml:latest}"
+CONTAINER_NAME="${NON_ML_CONTAINER_NAME:-rct-eval}"
 mkdir -p "$LOG_DIR"
 
 ts() { date +%Y-%m-%dT%H:%M:%S; }
