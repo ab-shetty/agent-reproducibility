@@ -136,6 +136,25 @@ Recommended template split:
 - `My Templates` -> `agent-repro-ml`: image `ashetty21/ml-gpu:latest`
 - `My Templates` -> `agent-repro-non-ml`: image `ashetty21/non-ml:latest`
 
+### RunPod Workspace
+
+If your template mounts persistent storage at `/workspace`, do your actual research work there instead of in `~`.
+
+Why:
+
+- files in `/workspace` survive pod restarts and stop/start cycles
+- files written only under the container home directory may be lost when the pod is recreated
+
+Recommended pattern on RunPod:
+
+```bash
+cd /workspace
+mkdir -p project
+cd project
+```
+
+Then clone repos, download artifacts, and save intermediate outputs under `/workspace`.
+
 ---
 
 ## Running a Session

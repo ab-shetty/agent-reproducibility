@@ -174,7 +174,7 @@ echo "[$(ts)] START [paper=$PAPER_NAME] [researcher=$RESEARCHER] [condition=$CON
 DOCENT_API_KEY_Q=$(printf '%q' "$DOCENT_API_KEY")
 script -q "$SESSION_TMP" \
   ssh "${SSH_ARGS[@]}" -t "${RUNPOD_USER}@${RUNPOD_HOST}" \
-  "DOCENT_API_KEY=$DOCENT_API_KEY_Q exec /bin/bash -l" || true
+  "/bin/bash -lc 'cd /workspace 2>/dev/null || cd \"\$HOME\"; export DOCENT_API_KEY=$DOCENT_API_KEY_Q; exec /bin/bash'" || true
 
 END_EPOCH=$(date +%s)
 DURATION=$(( END_EPOCH - START_EPOCH ))
