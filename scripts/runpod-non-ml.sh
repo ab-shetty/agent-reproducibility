@@ -17,6 +17,8 @@ if [ -f "$SCRIPT_DIR/../.env" ]; then
   source "$SCRIPT_DIR/../.env"
   set +a
 fi
+LOCAL_PYTHON="$SCRIPT_DIR/.venv/bin/python"
+[ ! -x "$LOCAL_PYTHON" ] && LOCAL_PYTHON="python3"
 LOG_DIR="$SCRIPT_DIR/../logs"
 mkdir -p "$LOG_DIR"
 
@@ -28,7 +30,6 @@ CONDITION=""
 SESSION_ID=""
 ENV_JSON=""
 RUNPOD_GATEWAY_MODE=""
-RCT_DIR="${RUNPOD_RCT_DIR:-/opt/rct}"
 
 RUNPOD_USER="${RUNPOD_USER:-root}"
 RUNPOD_HOST="${RUNPOD_SSH_HOST:-ssh.runpod.io}"
@@ -112,13 +113,6 @@ fi
 echo "[$(ts)] >> Verifying Python on RunPod..."
 if ! ssh_remote "command -v python3 >/dev/null 2>&1"; then
   echo "[$(ts)] ERROR: python3 not found on RunPod pod."
-  exit 1
-fi
-
-echo "[$(ts)] >> Verifying Docent helper scripts in image..."
-if ! ssh_remote "test -f '$RCT_DIR/upload_non_ml_to_docent.py'"; then
-  echo "[$(ts)] ERROR: $RCT_DIR/upload_non_ml_to_docent.py not found on RunPod pod."
-  echo "[$(ts)]        Rebuild and redeploy the RunPod image after baking docent/ into it."
   exit 1
 fi
 
@@ -215,10 +209,11 @@ if [[ "$UPLOAD" =~ ^[Yy]$ ]]; then
     export DOCENT_API_KEY
   fi
   COLLECTION="${DOCENT_COLLECTION:-non-ml-reproducibility}"
-
-  ssh_remote "export DOCENT_API_KEY='$DOCENT_API_KEY'; python3 '$RCT_DIR/upload_non_ml_to_docent.py' \
-    --master-log '$MASTER_LOG' \
-    --collection-name '$COLLECTION'" && echo "[$(ts)] Upload complete." || echo "[$(ts)] ERROR: Upload failed."
+  export DOCENT_API_KEY
+  "$LOCAL_PYTHON" "$SCRIPT_DIR/../docent/upload_non_ml_to_docent.py" \
+    --master-log "$MASTER_LOG" \
+    --collection-name "$COLLECTION" \
+    && echo "[$(ts)] Upload complete." || echo "[$(ts)] ERROR: Upload failed."
 fi
 
 echo ""

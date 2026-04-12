@@ -190,7 +190,7 @@ The script will:
 3. Capture environment info
 4. Drop you into the pod shell — do your work, type `exit` when done
 5. On exit: record timing, append cleaned terminal recording to log, write sidecar
-6. Prompt to upload session to Docent
+6. Prompt to upload the local master log to Docent from your machine
 
 ---
 

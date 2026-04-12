@@ -17,6 +17,8 @@ if [ -f "$SCRIPT_DIR/../.env" ]; then
   source "$SCRIPT_DIR/../.env"
   set +a
 fi
+LOCAL_PYTHON="$SCRIPT_DIR/.venv/bin/python"
+[ ! -x "$LOCAL_PYTHON" ] && LOCAL_PYTHON="python3"
 LOG_DIR="$SCRIPT_DIR/../logs"
 DOCKER_IMAGE="${NON_ML_DOCKER_IMAGE:-ashetty21/non-ml:latest}"
 CONTAINER_NAME="${NON_ML_CONTAINER_NAME:-rct-eval}"
@@ -218,15 +220,11 @@ if [[ "$UPLOAD" =~ ^[Yy]$ ]]; then
     export DOCENT_API_KEY
   fi
   COLLECTION="${DOCENT_COLLECTION:-non-ml-reproducibility}"
-
-  # Copy master log to Lambda so it's accessible via volume mount in container
-  REMOTE_LOG="~/$(basename $MASTER_LOG)"
-  scp -i "$SSH_KEY" -o StrictHostKeyChecking=no "$MASTER_LOG" "${LAMBDA_USER}@${LAMBDA_HOST}:$REMOTE_LOG"
-
-  $SSH_CMD "$DOCKER exec -e DOCENT_API_KEY=$DOCENT_API_KEY $CONTAINER_NAME \
-    python3 work/rct/upload_non_ml_to_docent.py \
-    --master-log work/$(basename $MASTER_LOG) \
-    --collection-name $COLLECTION" && echo "[$(ts)] Upload complete." || echo "[$(ts)] ERROR: Upload failed."
+  export DOCENT_API_KEY
+  "$LOCAL_PYTHON" "$SCRIPT_DIR/../docent/upload_non_ml_to_docent.py" \
+    --master-log "$MASTER_LOG" \
+    --collection-name "$COLLECTION" \
+    && echo "[$(ts)] Upload complete." || echo "[$(ts)] ERROR: Upload failed."
 fi
 
 # ── Teardown ──────────────────────────────────────────────────────────────────
