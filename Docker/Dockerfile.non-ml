@@ -82,6 +82,10 @@ RUN pip install --no-cache-dir \
     # Notebooks
     jupyter jupyterlab ipywidgets
 
+# ── Docent runtime helpers ───────────────────────────────────
+RUN pip install --no-cache-dir docent-python
+COPY docent /opt/rct
+
 # ── Non-root user ────────────────────────────────────────────
 ARG USERNAME=researcher
 ARG UID=1000

@@ -27,6 +27,8 @@ MASTER_LOG=""
 CONDITION=""
 SESSION_ID=""
 ENV_JSON=""
+RUNPOD_GATEWAY_MODE=""
+RCT_DIR="${RUNPOD_RCT_DIR:-/opt/rct}"
 
 RUNPOD_USER="${RUNPOD_USER:-root}"
 RUNPOD_HOST="${RUNPOD_SSH_HOST:-ssh.runpod.io}"
@@ -35,15 +37,21 @@ SSH_KEY="${SSH_KEY:-$HOME/.ssh/lambda_key}"
 SSH_ARGS=(-i "$SSH_KEY" -p "$RUNPOD_PORT" -o StrictHostKeyChecking=no)
 
 [ -z "$RUNPOD_USER" ] && echo "ERROR: RUNPOD_USER not set in .env" && exit 1
+[ "$RUNPOD_HOST" = "ssh.runpod.io" ] && RUNPOD_GATEWAY_MODE="1"
 
 ssh_remote() {
-  ssh "${SSH_ARGS[@]}" "${RUNPOD_USER}@${RUNPOD_HOST}" "$@"
-}
-
-upload_file() {
-  local src="$1"
-  local dest="$2"
-  ssh_remote "cat > $dest" < "$src"
+  local stdout_file stderr_file status
+  stdout_file=$(mktemp)
+  stderr_file=$(mktemp)
+  if ssh "${SSH_ARGS[@]}" "${RUNPOD_USER}@${RUNPOD_HOST}" "$@" >"$stdout_file" 2>"$stderr_file"; then
+    status=0
+  else
+    status=$?
+  fi
+  sed "/^Error: Your SSH client doesn't support PTY$/d" "$stdout_file"
+  sed "/^Error: Your SSH client doesn't support PTY$/d" "$stderr_file" >&2
+  rm -f "$stdout_file" "$stderr_file"
+  return $status
 }
 
 remote_python() {
@@ -97,20 +105,22 @@ if ! ssh_remote "echo 'SSH OK'" 2>/dev/null; then
 fi
 echo "[$(ts)]    Connected."
 
+if [ -n "$RUNPOD_GATEWAY_MODE" ]; then
+  echo "[$(ts)] >> RunPod gateway mode detected (ssh.runpod.io)."
+fi
+
 echo "[$(ts)] >> Verifying Python on RunPod..."
 if ! ssh_remote "command -v python3 >/dev/null 2>&1"; then
   echo "[$(ts)] ERROR: python3 not found on RunPod pod."
   exit 1
 fi
 
-echo "[$(ts)] >> Syncing docent/ to RunPod..."
-ssh_remote "mkdir -p ~/rct"
-for file in "$SCRIPT_DIR/../docent/"*.py; do
-  upload_file "$file" "~/rct/$(basename "$file")"
-done
-
-echo "[$(ts)] >> Installing docent-python on RunPod..."
-ssh_remote "python3 -m pip install -q docent-python"
+echo "[$(ts)] >> Verifying Docent helper scripts in image..."
+if ! ssh_remote "test -f '$RCT_DIR/upload_non_ml_to_docent.py'"; then
+  echo "[$(ts)] ERROR: $RCT_DIR/upload_non_ml_to_docent.py not found on RunPod pod."
+  echo "[$(ts)]        Rebuild and redeploy the RunPod image after baking docent/ into it."
+  exit 1
+fi
 
 echo ""
 [ -z "$PAPER_NAME" ] && read -p "Enter Paper Name (exact title): " PAPER_NAME
@@ -167,9 +177,10 @@ SESSION_TMP=$(mktemp)
 START_EPOCH=$(date +%s)
 echo "[$(ts)] START [paper=$PAPER_NAME] [researcher=$RESEARCHER] [condition=$CONDITION]" | tee -a "$MASTER_LOG"
 
+DOCENT_API_KEY_Q=$(printf '%q' "$DOCENT_API_KEY")
 script -q "$SESSION_TMP" \
   ssh "${SSH_ARGS[@]}" -t "${RUNPOD_USER}@${RUNPOD_HOST}" \
-  "export DOCENT_API_KEY='$DOCENT_API_KEY'; exec /bin/bash -l" || true
+  "DOCENT_API_KEY=$DOCENT_API_KEY_Q exec /bin/bash -l" || true
 
 END_EPOCH=$(date +%s)
 DURATION=$(( END_EPOCH - START_EPOCH ))
@@ -205,11 +216,8 @@ if [[ "$UPLOAD" =~ ^[Yy]$ ]]; then
   fi
   COLLECTION="${DOCENT_COLLECTION:-non-ml-reproducibility}"
 
-  REMOTE_LOG="~/$(basename $MASTER_LOG)"
-  upload_file "$MASTER_LOG" "$REMOTE_LOG"
-
-  ssh_remote "export DOCENT_API_KEY='$DOCENT_API_KEY'; python3 ~/rct/upload_non_ml_to_docent.py \
-    --master-log '$REMOTE_LOG' \
+  ssh_remote "export DOCENT_API_KEY='$DOCENT_API_KEY'; python3 '$RCT_DIR/upload_non_ml_to_docent.py' \
+    --master-log '$MASTER_LOG' \
     --collection-name '$COLLECTION'" && echo "[$(ts)] Upload complete." || echo "[$(ts)] ERROR: Upload failed."
 fi
 
