@@ -89,7 +89,6 @@ echo ""
 
 if [ "$CONDITION" = "ai-assisted" ]; then
     echo "Hints:"
-    echo "  npm i -g @openai/codex          # install Codex CLI"
     echo "  codex --dangerously-bypass-approvals-and-sandbox"
     echo ""
 fi

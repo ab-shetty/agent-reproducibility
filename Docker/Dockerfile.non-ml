@@ -82,6 +82,9 @@ RUN pip install --no-cache-dir \
     # Notebooks
     jupyter jupyterlab ipywidgets
 
+# ── Codex CLI ────────────────────────────────────────────────
+RUN npm install -g @openai/codex
+
 # ── Docent runtime helpers ───────────────────────────────────
 RUN pip install --no-cache-dir docent-python
 COPY docent/ /opt/rct/
