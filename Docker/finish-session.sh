@@ -27,17 +27,8 @@ if [ "$CONDITION" = "manual" ] && [ -n "$RCT_SESSION_REC" ] && [ -f "$RCT_SESSIO
     {
         echo ""
         echo "--- SESSION RECORDING ---"
-        python3 - "$RCT_SESSION_REC" << 'PYEOF'
-import sys, re
-raw = open(sys.argv[1], 'rb').read().decode('utf-8', errors='replace')
-clean = re.sub(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)', '', raw)
-clean = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', clean)
-clean = re.sub(r'[\x00-\x08\x0b-\x1f\x7f]', '', clean)
-clean = re.sub(r'\d+;[^\n]*?[@:][^\n]*?[\$#] ', '', clean)
-print(clean, end='')
-PYEOF
+        cat "$RCT_SESSION_REC"
     } >> "$RCT_MASTER_LOG"
-    rm -f "$RCT_SESSION_REC"
 fi
 
 # ── Write sidecar metadata ───────────────────────────────────

@@ -105,8 +105,13 @@ echo ""
 
 touch "$GUARD"
 
-# ── Wrap shell in script for manual sessions ────────────────
+# ── Log CLI commands for manual sessions ────────────────────
 if [ "$CONDITION" = "manual" ]; then
     export RCT_SESSION_REC="/tmp/session_recording_${RCT_SESSION_ID}.txt"
-    SHELL=/bin/bash exec script -q "$RCT_SESSION_REC"
+    _rct_log_cmd() {
+        local cmd
+        cmd=$(history 1 | sed 's/^ *[0-9]* *//')
+        echo "$(date +%Y-%m-%dT%H:%M:%S) \$ $cmd" >> "$RCT_SESSION_REC"
+    }
+    PROMPT_COMMAND="_rct_log_cmd${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 fi
