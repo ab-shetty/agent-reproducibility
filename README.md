@@ -1,226 +1,70 @@
 # agent-reproducibility
 
-## Running the ML-GPU Docker Image
+Infrastructure for a reproducibility RCT — researchers attempt to reproduce ML and non-ML papers under two conditions: **AI-assisted** (using Codex) vs. **manual** (human only). Sessions are timed, logged, and uploaded to [Docent](https://docent.dev) for analysis.
 
-```bash
- docker run --gpus all -it -v $(pwd):/home/researcher/work ashetty21/ml-gpu:latest
-```
+## Quick Start
 
-## Running the Non-ML Docker Image
+1. Deploy a RunPod pod from the appropriate template (see below).
+2. SSH into the pod — session setup starts automatically on first connect.
+3. Do your work (and if AI-assisted, use Codex).
+4. Run `finish-session` to stop the timer and upload to Docent.
 
-```bash
-docker run -it -v $(pwd):/home/researcher/work ashetty21/non-ml:latest
-```
+## RunPod Templates
 
-### Installing Codex
+### ML / GPU (AI-assisted condition)
 
-```bash
-sudo npm i -g @openai/codex
-```
+**Template:** [Deploy ML template](https://console.runpod.io/deploy?template=jo8klw71d0&ref=bd37kdkt)
 
-### Running Codex
+- Image: `ashetty21/ml-gpu:latest` — CUDA 12.1, PyTorch, HuggingFace, conda, Python 3.11
+- Disk: 40GB container + 40GB volume
+- Includes Codex CLI
 
+### Non-ML (manual condition)
+
+**Template:** [Deploy Non-ML template](https://console.runpod.io/deploy?template=071bthitdg&ref=bd37kdkt)
+
+- Image: `ashetty21/non-ml:latest` — Python 3.11, R 4.x, stats/data packages
+- Disk: 20GB container
+
+## Session Workflow
+
+### 1. Connect to the pod
+
+SSH into the RunPod pod. On first interactive login, `start-session.sh` runs automatically and prompts for:
+
+- **Paper Name** (exact title)
+- **Researcher Name**
+- **Condition** (`manual` or `ai-assisted`)
+- **DOCENT_API_KEY** (leave blank to skip upload)
+
+These can also be set as environment variables in the RunPod template to skip the prompts.
+
+The script captures environment info (CPU, RAM, GPU, Python, R), starts the timer, and begins logging to `/workspace/logs/`.
+
+### 2. Do your work
+
+For AI-assisted sessions:
 ```bash
 codex --dangerously-bypass-approvals-and-sandbox
 ```
 
-## Uploading Codex Runs to Docent
+For manual sessions, just work normally.
 
-Use `docent/upload_codex_to_docent.py` to upload a Codex rollout JSONL to a Docent collection.
-
-**Prerequisites:** Set `DOCENT_API_KEY` in your environment.
-
-**Running the upload script directly:**
+### 3. Finish the session
 
 ```bash
-python docent/upload_codex_to_docent.py \
-  --path <path to rollout .jsonl> \
-  --collection-name "berkeley-pilot" \
-  --tag "<TOPIC>"
+finish-session
 ```
 
-**Asking Codex to find and upload a run by topic:**
-
-```
-Using the script at <path to upload_codex_to_docent.py>,
-find the rollout JSONL file for the conversation about <TOPIC>,
-then run:
-
-  python <path to upload_codex_to_docent.py> \
-    --path <found file> \
-    --collection-name "berkeley-pilot" \
-    --tag "<TOPIC>"
-```
-
-The script will reuse an existing collection with the given name, or create one if it doesn't exist. Use `--dry-run` to validate without uploading.
-
----
-
-## Non-ML and ML Session Setup
-
-### Prerequisites
-
-- SSH key for Lambda instances at `~/.ssh/lambda_key`
-- A running Lambda instance (GPU for ML condition, CPU for non-ML)
-- A running RunPod pod with SSH enabled if using the RunPod scripts
-- For RunPod, launch the pod from the runtime image you want to work inside; the RunPod scripts connect directly to that pod and do not start nested Docker containers
-- Docent API key
-
-### SSH Key Setup
-
-```bash
-# Generate a key if you don't have one
-ssh-keygen -t ed25519 -f ~/.ssh/lambda_key
-
-# Add the public key to your Lambda instance via the Lambda dashboard
-cat ~/.ssh/lambda_key.pub
-```
-
-### Environment Setup
-
-Copy `.env.example` to `.env` and fill in your values:
-
-```bash
-cp .env.example .env
-```
-
-```env
-LAMBDA_HOST=<your Lambda instance IP>
-LAMBDA_USER=ubuntu
-RUNPOD_USER=<your RunPod SSH username>
-RUNPOD_SSH_HOST=ssh.runpod.io
-RUNPOD_SSH_PORT=22
-SSH_KEY=~/.ssh/lambda_key
-DOCENT_API_KEY=<your Docent API key>
-PAPER_NAME="<exact paper title>"
-RESEARCHER="<your name>"
-ML_DOCKER_IMAGE=ashetty21/ml-gpu:latest
-ML_CONTAINER_NAME=rct-ml-eval
-NON_ML_DOCKER_IMAGE=ashetty21/non-ml:latest
-NON_ML_CONTAINER_NAME=rct-eval
-MODE=gpu          # gpu or cpu
-DOCENT_COLLECTION=berkeley-pilot
-```
-
-`ML_DOCKER_IMAGE`, `ML_CONTAINER_NAME`, `NON_ML_DOCKER_IMAGE`, and `NON_ML_CONTAINER_NAME` are used by the Lambda scripts. The RunPod scripts connect directly into the pod you launched.
-
-For RunPod, use the SSH endpoint form:
-
-```bash
-ssh 042llwqdpoddj3-644118db@ssh.runpod.io -i ~/.ssh/id_ed25519
-```
-
-That maps to:
-
-```env
-RUNPOD_USER=042llwqdpoddj3-644118db
-RUNPOD_SSH_HOST=ssh.runpod.io
-RUNPOD_SSH_PORT=22
-SSH_KEY=~/.ssh/id_ed25519
-```
-
-### RunPod Setup
-
-Create a template under `My Templates` for each runtime you want to launch:
-
-1. In RunPod, open `My Templates`.
-2. Create a new template.
-3. Set the image to `ashetty21/ml-gpu:latest` for the ML/Codex condition, or `ashetty21/non-ml:latest` for the manual non-ML condition.
-4. Enable SSH for the pod so RunPod provides the `ssh.runpod.io` connection form.
-5. Launch a pod from that template.
-6. Copy the pod's SSH username into `.env` as `RUNPOD_USER`.
-7. Keep `RUNPOD_SSH_HOST=ssh.runpod.io` and `RUNPOD_SSH_PORT=22` unless RunPod shows a different SSH endpoint.
-
-Recommended template split:
-
-- `My Templates` -> `agent-repro-ml`: image `ashetty21/ml-gpu:latest`
-- `My Templates` -> `agent-repro-non-ml`: image `ashetty21/non-ml:latest`
-
-### RunPod Workspace
-
-If your template mounts persistent storage at `/workspace`, do your actual research work there instead of in `~`.
-
-Why:
-
-- files in `/workspace` survive pod restarts and stop/start cycles
-- files written only under the container home directory may be lost when the pod is recreated
-
-Recommended pattern on RunPod:
-
-```bash
-cd /workspace
-mkdir -p project
-cd project
-```
-
-Then clone repos, download artifacts, and save intermediate outputs under `/workspace`.
-
----
-
-## Running a Session
-
-### AI-Assisted Condition (ML / Codex)
-
-```bash
-bash scripts/lambda-ml.sh
-```
-
-Or on RunPod:
-
-```bash
-bash scripts/runpod-ml.sh
-```
-
-Use the `ssh.runpod.io` SSH endpoint here.
-
-The RunPod script connects directly into the pod you launched, syncs the Docent helper scripts to `~/rct`, and runs the session there.
-
-The script will:
-1. Connect to RunPod over SSH/TCP
-2. Sync `docent/` to `~/rct` on the pod and install `docent-python`
-3. Capture environment info (CPU, RAM, GPU, Python)
-4. Drop you into the pod shell — install and run Codex:
-   ```bash
-   sudo npm i -g @openai/codex
-   codex --dangerously-bypass-approvals-and-sandbox
-   ```
-5. On exit: record timing and write sidecar metadata to `/tmp/session_meta.json` on the pod
-6. Prompt to upload all Codex rollouts from the session to Docent
-
-### Manual Condition (Non-ML)
-
-```bash
-bash scripts/lambda-non-ml.sh
-```
-
-Or on RunPod:
-
-```bash
-bash scripts/runpod-non-ml.sh
-```
-
-Use the `ssh.runpod.io` SSH endpoint here.
-
-The RunPod script connects directly into the pod you launched, syncs the Docent helper scripts to `~/rct`, and runs the session there.
-
-The script will:
-1. Connect to RunPod over SSH/TCP
-2. Sync `docent/` to `~/rct` on the pod and install `docent-python`
-3. Capture environment info
-4. Drop you into the pod shell — do your work, type `exit` when done
-5. On exit: record timing, append cleaned terminal recording to log, write sidecar
-6. Prompt to upload the local master log to Docent from your machine
-
----
+This command:
+1. Stops the timer and records duration
+2. Writes sidecar metadata to `/tmp/session_meta.json`
+3. Auto-detects Codex rollouts from `~/.codex/sessions/`
+4. Prompts to upload to Docent
 
 ## Logs
 
-All logs are saved locally to `logs/` (gitignored).
-
-| File | Description |
-|------|-------------|
-| `<paper>_<researcher>_<condition>_<session_id>.log` | Master log — env info, timing, and (non-ML only) full session recording |
-| `/tmp/session_meta.json` (in container) | Sidecar JSON — structured metadata for Docent upload |
+All logs are saved to `/workspace/logs/` on the pod.
 
 ### Log filename format
 
@@ -231,10 +75,11 @@ PAPER_NAME_RESEARCHER_CONDITION_YYYYMMDD_HHMMSS.log
 Example:
 ```
 LLaVA_Derrick_Chan-Sew_ai-assisted_20260406_183433.log
-LLaVA_Derrick_Chan-Sew_manual_20260406_183433.log
 ```
 
-### Sidecar JSON fields
+### Sidecar JSON
+
+Written to `/tmp/session_meta.json` on the pod:
 
 ```json
 {
@@ -246,10 +91,7 @@ LLaVA_Derrick_Chan-Sew_manual_20260406_183433.log
   "end_time": "...",
   "duration_seconds": 0,
   "status": "complete | interrupted",
-  "provider": "lambda | runpod",
-  "lambda_host": "...",
-  "runpod_host": "...",
-  "runpod_port": "22",
+  "provider": "runpod",
   "env": {
     "cpu": "...",
     "ram": "...",
@@ -259,3 +101,33 @@ LLaVA_Derrick_Chan-Sew_manual_20260406_183433.log
   }
 }
 ```
+
+## Docent Upload Scripts
+
+Upload scripts live in `docent/` and are baked into the Docker images at `/opt/rct/`:
+
+| Script | What it uploads |
+|--------|----------------|
+| `upload_codex_to_docent.py` | Codex CLI rollout JSONL (`~/.codex/sessions/`) |
+| `upload_non_ml_to_docent.py` | Master log with embedded session recording |
+
+`finish-session` calls these automatically. To upload manually:
+
+```bash
+# Codex rollout
+python3 /opt/rct/upload_codex_to_docent.py \
+  --path <rollout.jsonl> \
+  --collection-name "berkeley-pilot" \
+  --meta-sidecar /tmp/session_meta.json
+
+# Manual session
+python3 /opt/rct/upload_non_ml_to_docent.py \
+  --master-log <master.log> \
+  --collection-name "berkeley-pilot"
+```
+
+All scripts support `--dry-run` to validate without uploading.
+
+## Workspace
+
+Do your research work under `/workspace` on the pod — files there survive pod restarts if you have persistent volume storage attached.
