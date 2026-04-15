@@ -13,7 +13,7 @@ Infrastructure for a reproducibility RCT — researchers attempt to reproduce ML
 
 ### ML / GPU (AI-assisted condition)
 
-**Template:** [Deploy ML template](https://console.runpod.io/deploy?template=jo8klw71d0&ref=bd37kdkt)
+**Template:** [Deploy ML template](https://console.runpod.io/deploy?type=GPU&gpu=A40&count=1&template=jo8klw71d0)
 
 - Image: `ashetty21/ml-gpu:latest` — CUDA 12.1, PyTorch, HuggingFace, conda, Python 3.11
 - Disk: 40GB container + 40GB volume
@@ -21,10 +21,10 @@ Infrastructure for a reproducibility RCT — researchers attempt to reproduce ML
 
 ### Non-ML (manual condition)
 
-**Template:** [Deploy Non-ML template](https://console.runpod.io/deploy?template=071bthitdg&ref=bd37kdkt)
+**Template:** [Deploy Non-ML template](https://console.runpod.io/deploy?type=GPU&gpu=A40&count=1&template=071bthitdg)
 
 - Image: `ashetty21/non-ml:latest` — Python 3.11, R 4.x, stats/data packages
-- Disk: 20GB container
+- Disk: 40GB container
 
 ## Session Workflow
 
