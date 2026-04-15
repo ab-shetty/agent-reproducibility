@@ -27,7 +27,23 @@ if [ -z "$PAPER_NAME" ]; then
     export PAPER_NAME
 fi
 if [ -z "$RESEARCHER" ]; then
-    read -p "Enter Researcher Name: " RESEARCHER
+    echo "Select researcher:"
+    echo "  1) Abhishek"
+    echo "  2) Derrick"
+    echo "  3) Tilman"
+    echo "  4) Rumi"
+    echo "  5) Eric"
+    echo "  6) Matilda"
+    read -p "Choice [1-6]: " RES_CHOICE
+    case "$RES_CHOICE" in
+      1) RESEARCHER="Abhishek" ;;
+      2) RESEARCHER="Derrick" ;;
+      3) RESEARCHER="Tilman" ;;
+      4) RESEARCHER="Rumi" ;;
+      5) RESEARCHER="Eric" ;;
+      6) RESEARCHER="Matilda" ;;
+      *) echo "ERROR: Invalid choice. Enter 1-6." ; return 1 2>/dev/null || exit 1 ;;
+    esac
     export RESEARCHER
 fi
 if [ -z "$CONDITION" ]; then
@@ -47,7 +63,16 @@ if [ -z "$DOCENT_API_KEY" ]; then
     export DOCENT_API_KEY
 fi
 if [ -z "$DOCENT_COLLECTION" ]; then
-    export DOCENT_COLLECTION="berkeley-pilot"
+    echo "Select Docent collection:"
+    echo "  1) berkeley-pilot"
+    echo "  2) berkeley-final"
+    read -p "Choice [1/2]: " COL_CHOICE
+    case "$COL_CHOICE" in
+      1) DOCENT_COLLECTION="berkeley-pilot" ;;
+      2) DOCENT_COLLECTION="berkeley-final" ;;
+      *) echo "ERROR: Invalid choice. Enter 1 or 2." ; return 1 2>/dev/null || exit 1 ;;
+    esac
+    export DOCENT_COLLECTION
 fi
 
 # ── Session identifiers ─────────────────────────────────────

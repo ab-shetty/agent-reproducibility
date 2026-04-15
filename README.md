@@ -1,6 +1,6 @@
 # agent-reproducibility
 
-Infrastructure for a reproducibility RCT — researchers attempt to reproduce ML and non-ML papers under two conditions: **AI-assisted** (using Codex) vs. **manual** (human only). Sessions are timed, logged, and uploaded to [Docent](https://docent.dev) for analysis.
+Infrastructure for a reproducibility RCT — researchers attempt to reproduce ML and non-ML papers under two conditions: **AI-assisted** (using Codex) vs. **manual** (human only). Sessions are timed, logged, and uploaded to [Docent](https://docent.transluce.org) for analysis.
 
 ## Quick Start
 
@@ -11,7 +11,7 @@ Infrastructure for a reproducibility RCT — researchers attempt to reproduce ML
 
 ## RunPod Templates
 
-### ML / GPU (AI-assisted condition)
+### ML / GPU
 
 **Template:** [Deploy ML template](https://console.runpod.io/deploy?type=GPU&gpu=A40&count=1&template=jo8klw71d0)
 
@@ -19,12 +19,14 @@ Infrastructure for a reproducibility RCT — researchers attempt to reproduce ML
 - Disk: 40GB container + 40GB volume
 - Includes Codex CLI
 
-### Non-ML (manual condition)
+### Non-ML
 
 **Template:** [Deploy Non-ML template](https://console.runpod.io/deploy?type=GPU&gpu=A40&count=1&template=071bthitdg)
 
 - Image: `ashetty21/non-ml:latest` — Python 3.11, R 4.x, stats/data packages
-- Disk: 40GB container
+- Includes Codex CLI
+
+Both templates support both conditions (manual and AI-assisted). The choice is made at session start.
 
 ## Session Workflow
 
@@ -33,13 +35,16 @@ Infrastructure for a reproducibility RCT — researchers attempt to reproduce ML
 SSH into the RunPod pod. On first interactive login, `start-session.sh` runs automatically and prompts for:
 
 - **Paper Name** (exact title)
-- **Researcher Name**
-- **Condition** (`manual` or `ai-assisted`)
+- **Researcher** (select from: Abhishek, Derrick, Tilman, Rumi, Eric, Matilda)
+- **Condition** (select `1` for manual or `2` for AI-assisted)
 - **DOCENT_API_KEY** (leave blank to skip upload)
+- **Docent Collection** (select `1` for berkeley-pilot or `2` for berkeley-final)
 
 These can also be set as environment variables in the RunPod template to skip the prompts.
 
 The script captures environment info (CPU, RAM, GPU, Python, R), starts the timer, and begins logging to `/workspace/logs/`.
+
+For manual sessions, the script also starts a `script` recording that captures the full terminal session (commands and output).
 
 ### 2. Do your work
 
@@ -48,7 +53,7 @@ For AI-assisted sessions:
 codex --dangerously-bypass-approvals-and-sandbox
 ```
 
-For manual sessions, just work normally.
+For manual sessions, just work normally — everything is recorded.
 
 ### 3. Finish the session
 
@@ -59,8 +64,9 @@ finish-session
 This command:
 1. Stops the timer and records duration
 2. Writes sidecar metadata to `/tmp/session_meta.json`
-3. Auto-detects Codex rollouts from `~/.codex/sessions/`
-4. Prompts to upload to Docent
+3. For AI-assisted: auto-detects Codex rollouts from `~/.codex/sessions/`
+4. For manual: appends the cleaned terminal recording to the master log
+5. Prompts to upload to Docent
 
 ## Logs
 
@@ -90,7 +96,7 @@ Written to `/tmp/session_meta.json` on the pod:
   "start_time": "...",
   "end_time": "...",
   "duration_seconds": 0,
-  "status": "complete | interrupted",
+  "status": "complete",
   "provider": "runpod",
   "env": {
     "cpu": "...",
@@ -109,7 +115,7 @@ Upload scripts live in `docent/` and are baked into the Docker images at `/opt/r
 | Script | What it uploads |
 |--------|----------------|
 | `upload_codex_to_docent.py` | Codex CLI rollout JSONL (`~/.codex/sessions/`) |
-| `upload_non_ml_to_docent.py` | Master log with embedded session recording |
+| `upload_non_ml_to_docent.py` | Manual session recording parsed into command/output transcript |
 
 `finish-session` calls these automatically. To upload manually:
 
