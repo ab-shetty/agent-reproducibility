@@ -22,6 +22,24 @@ DURATION=$(( END_EPOCH - RCT_START_EPOCH ))
 
 echo "[$(ts)] END | duration=${DURATION}s" | tee -a "$RCT_MASTER_LOG"
 
+# ── Append session recording for manual runs ────────────────
+if [ "$CONDITION" = "manual" ] && [ -n "$RCT_SESSION_REC" ] && [ -f "$RCT_SESSION_REC" ]; then
+    {
+        echo ""
+        echo "--- SESSION RECORDING ---"
+        python3 - "$RCT_SESSION_REC" << 'PYEOF'
+import sys, re
+raw = open(sys.argv[1], 'rb').read().decode('utf-8', errors='replace')
+clean = re.sub(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)', '', raw)
+clean = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', clean)
+clean = re.sub(r'[\x00-\x08\x0b-\x1f\x7f]', '', clean)
+clean = re.sub(r'\d+;[^\n]*?[@:][^\n]*?[\$#] ', '', clean)
+print(clean, end='')
+PYEOF
+    } >> "$RCT_MASTER_LOG"
+    rm -f "$RCT_SESSION_REC"
+fi
+
 # ── Write sidecar metadata ───────────────────────────────────
 START_TIME=$(date -d @$RCT_START_EPOCH +%Y-%m-%dT%H:%M:%S 2>/dev/null || date -r $RCT_START_EPOCH +%Y-%m-%dT%H:%M:%S 2>/dev/null || echo "")
 

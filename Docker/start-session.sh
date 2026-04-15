@@ -31,8 +31,15 @@ if [ -z "$RESEARCHER" ]; then
     export RESEARCHER
 fi
 if [ -z "$CONDITION" ]; then
-    echo "Conditions: manual | ai-assisted"
-    read -p "Enter Condition: " CONDITION
+    echo "Select condition:"
+    echo "  1) manual"
+    echo "  2) ai-assisted"
+    read -p "Choice [1/2]: " COND_CHOICE
+    case "$COND_CHOICE" in
+      1) CONDITION="manual" ;;
+      2) CONDITION="ai-assisted" ;;
+      *) echo "ERROR: Invalid choice. Enter 1 or 2." ; return 1 2>/dev/null || exit 1 ;;
+    esac
     export CONDITION
 fi
 if [ -z "$DOCENT_API_KEY" ]; then
@@ -97,3 +104,9 @@ echo "Type 'finish-session' when done to stop timing and upload to Docent."
 echo ""
 
 touch "$GUARD"
+
+# ── Wrap shell in script for manual sessions ────────────────
+if [ "$CONDITION" = "manual" ]; then
+    export RCT_SESSION_REC="/tmp/session_recording_${RCT_SESSION_ID}.txt"
+    SHELL=/bin/bash exec script -q "$RCT_SESSION_REC"
+fi
