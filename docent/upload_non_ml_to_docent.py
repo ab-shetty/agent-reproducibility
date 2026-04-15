@@ -84,17 +84,56 @@ def parse_master_log(path: Path) -> dict:
     return meta
 
 
-def count_cli_commands(recording: str) -> int:
-    return sum(1 for line in recording.splitlines() if re.search(r'\$\s+\S', line))
+def parse_recording_into_messages(recording: str) -> list:
+    """Parse cleaned script recording into UserMessage/AssistantMessage pairs.
+
+    Each prompt line (user@host:path# cmd) becomes a UserMessage.
+    Any output between prompts becomes an AssistantMessage.
+    Stops before finish-session output.
+    """
+    messages = []
+    # Match prompt: optional (env) user@host:path[#$] command
+    prompt_re = re.compile(r'^(?:\([^)]+\)\s+)?\S+@\S+:[^#\$]*[#\$]\s*(.*)')
+
+    current_cmd = None
+    output_lines = []
+
+    for line in recording.splitlines():
+        m = prompt_re.match(line)
+        if m:
+            # Flush previous command + output
+            if current_cmd is not None:
+                if current_cmd.strip() == 'finish-session':
+                    break
+                if current_cmd.strip():
+                    messages.append(UserMessage(content=current_cmd.strip()))
+                    output = '\n'.join(output_lines).strip()
+                    if output:
+                        messages.append(AssistantMessage(content=output))
+            current_cmd = m.group(1)
+            output_lines = []
+        elif current_cmd is not None:
+            output_lines.append(line)
+
+    # Handle last command
+    if current_cmd and current_cmd.strip() and current_cmd.strip() != 'finish-session':
+        messages.append(UserMessage(content=current_cmd.strip()))
+        output = '\n'.join(output_lines).strip()
+        if output:
+            messages.append(AssistantMessage(content=output))
+
+    return messages
 
 
 def build_agent_run(meta: dict, master_log: Path) -> AgentRun:
     messages = [UserMessage(content=f"Reproduce the paper: {meta['paper']}")]
     recording = meta.get("session_recording")
     if recording:
-        messages.append(AssistantMessage(content=recording))
+        cmd_messages = parse_recording_into_messages(recording)
+        messages.extend(cmd_messages)
 
-    cli_count = count_cli_commands(recording) if recording else 0
+    # Count user commands (UserMessages minus the initial prompt)
+    cli_count = sum(1 for m in messages if isinstance(m, UserMessage)) - 1
 
     return AgentRun(
         name=master_log.stem,
@@ -149,8 +188,8 @@ def main() -> None:
     print(f"Status    : {meta['status']}")
     print(f"Env info  : {'yes' if meta['env_info'] else 'no'}")
     recording = meta.get("session_recording")
-    cli_count = count_cli_commands(recording) if recording else 0
-    print(f"Recording : {'yes' if recording else 'no'} ({cli_count} CLI commands)")
+    cmd_count = sum(1 for m in agent_run.transcripts[0].messages if isinstance(m, UserMessage)) - 1
+    print(f"Recording : {'yes' if recording else 'no'} ({cmd_count} CLI commands)")
 
     if args.dry_run:
         print("Dry run — skipping upload.")

@@ -105,13 +105,12 @@ echo ""
 
 touch "$GUARD"
 
-# ── Log CLI commands for manual sessions ────────────────────
+# ── Record full session for manual runs ────────────────────
+# script captures both commands and output. The subshell sources
+# .bashrc again but the guard file prevents re-running this setup.
+# User runs finish-session inside the script shell, then types
+# 'exit' to stop recording.
 if [ "$CONDITION" = "manual" ]; then
     export RCT_SESSION_REC="/tmp/session_recording_${RCT_SESSION_ID}.txt"
-    _rct_log_cmd() {
-        local cmd
-        cmd=$(history 1 | sed 's/^ *[0-9]* *//')
-        echo "$(date +%Y-%m-%dT%H:%M:%S) \$ $cmd" >> "$RCT_SESSION_REC"
-    }
-    PROMPT_COMMAND="_rct_log_cmd${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
+    script -qf "$RCT_SESSION_REC"
 fi

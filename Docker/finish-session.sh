@@ -27,7 +27,19 @@ if [ "$CONDITION" = "manual" ] && [ -n "$RCT_SESSION_REC" ] && [ -f "$RCT_SESSIO
     {
         echo ""
         echo "--- SESSION RECORDING ---"
-        cat "$RCT_SESSION_REC"
+        python3 - "$RCT_SESSION_REC" << 'PYEOF'
+import sys, re
+raw = open(sys.argv[1], 'rb').read().decode('utf-8', errors='replace')
+# Strip OSC sequences (window titles, colour changes)
+clean = re.sub(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)', '', raw)
+# Strip CSI and other escape sequences
+clean = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', clean)
+# Strip remaining control characters except newline and tab
+clean = re.sub(r'[\x00-\x08\x0b-\x1f\x7f]', '', clean)
+# Clean up prompt title remnants
+clean = re.sub(r'\d+;[^\n]*?[@:][^\n]*?[\$#] ', '', clean)
+print(clean, end='')
+PYEOF
     } >> "$RCT_MASTER_LOG"
 fi
 
