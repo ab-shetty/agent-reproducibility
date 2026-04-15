@@ -112,5 +112,5 @@ touch "$GUARD"
 # 'exit' to stop recording.
 if [ "$CONDITION" = "manual" ]; then
     export RCT_SESSION_REC="/tmp/session_recording_${RCT_SESSION_ID}.txt"
-    script -qf "$RCT_SESSION_REC"
+    script -qf "$RCT_SESSION_REC" /bin/bash
 fi
