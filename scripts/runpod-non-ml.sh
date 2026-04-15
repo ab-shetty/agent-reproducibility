@@ -30,6 +30,8 @@ CONDITION=""
 SESSION_ID=""
 ENV_JSON=""
 RUNPOD_GATEWAY_MODE=""
+ROLLOUT_ID=""
+RCT_DIR="${RUNPOD_RCT_DIR:-/opt/rct}"
 
 RUNPOD_USER="${RUNPOD_USER:-root}"
 RUNPOD_HOST="${RUNPOD_SSH_HOST:-ssh.runpod.io}"
@@ -120,7 +122,15 @@ echo ""
 [ -z "$PAPER_NAME" ] && read -p "Enter Paper Name (exact title): " PAPER_NAME
 [ -z "$RESEARCHER" ] && read -p "Enter Researcher Name: " RESEARCHER
 
-CONDITION="manual"
+echo "Select condition:"
+echo "  1) manual"
+echo "  2) ai-assisted"
+read -p "Choice [1/2]: " COND_CHOICE
+case "$COND_CHOICE" in
+  1) CONDITION="manual" ;;
+  2) CONDITION="ai-assisted" ;;
+  *) echo "ERROR: Invalid choice. Enter 1 or 2." && exit 1 ;;
+esac
 SAFE_PAPER=$(echo "$PAPER_NAME" | tr ' ' '_' | tr -cd '[:alnum:]_-')
 SAFE_RESEARCHER=$(echo "$RESEARCHER" | tr ' ' '_' | tr -cd '[:alnum:]_-')
 SESSION_ID=$(date +%Y%m%d_%H%M%S)
@@ -180,10 +190,12 @@ END_EPOCH=$(date +%s)
 DURATION=$(( END_EPOCH - START_EPOCH ))
 echo "[$(ts)] END | duration=${DURATION}s" | tee -a "$MASTER_LOG"
 
-{
-  echo ""
-  echo "--- SESSION RECORDING ---"
-  python3 - "$SESSION_TMP" << 'PYEOF'
+if [ -f "$SESSION_TMP" ]; then
+  if [ "$CONDITION" = "manual" ]; then
+    {
+      echo ""
+      echo "--- SESSION RECORDING ---"
+      python3 - "$SESSION_TMP" << 'PYEOF'
 import sys, re
 raw = open(sys.argv[1], 'rb').read().decode('utf-8', errors='replace')
 clean = re.sub(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)', '', raw)
@@ -192,8 +204,21 @@ clean = re.sub(r'[\x00-\x08\x0b-\x1f\x7f]', '', clean)
 clean = re.sub(r'\d+;[^\n]*?[@:][^\n]*?[\$#] ', '', clean)
 print(clean, end='')
 PYEOF
-} >> "$MASTER_LOG"
-rm -f "$SESSION_TMP"
+    } >> "$MASTER_LOG"
+  else
+    ROLLOUT_ID=$(python3 - "$SESSION_TMP" << 'PYEOF'
+import re
+import sys
+
+raw = open(sys.argv[1], 'rb').read().decode('utf-8', errors='replace')
+matches = re.findall(r'codex resume ([0-9a-f-]+)', raw)
+if matches:
+    print(matches[-1])
+PYEOF
+)
+  fi
+  rm -f "$SESSION_TMP"
+fi
 
 write_sidecar "complete" "$DURATION"
 
@@ -210,10 +235,56 @@ if [[ "$UPLOAD" =~ ^[Yy]$ ]]; then
   fi
   COLLECTION="${DOCENT_COLLECTION:-non-ml-reproducibility}"
   export DOCENT_API_KEY
-  "$LOCAL_PYTHON" "$SCRIPT_DIR/../docent/upload_non_ml_to_docent.py" \
-    --master-log "$MASTER_LOG" \
-    --collection-name "$COLLECTION" \
-    && echo "[$(ts)] Upload complete." || echo "[$(ts)] ERROR: Upload failed."
+
+  if [ "$CONDITION" = "manual" ]; then
+    "$LOCAL_PYTHON" "$SCRIPT_DIR/../docent/upload_non_ml_to_docent.py" \
+      --master-log "$MASTER_LOG" \
+      --collection-name "$COLLECTION" \
+      && echo "[$(ts)] Upload complete." || echo "[$(ts)] ERROR: Upload failed."
+  else
+    if [ -n "$ROLLOUT_ID" ]; then
+      JSONL_LIST=$(ssh_remote "python3 -" << PYEOF
+from pathlib import Path
+rollout_id = "$ROLLOUT_ID"
+root = Path.home() / ".codex" / "sessions"
+matches = sorted(root.rglob(f"rollout-*{rollout_id}*.jsonl"))
+for path in matches:
+    print(path)
+PYEOF
+)
+    else
+      JSONL_LIST=$(ssh_remote "python3 -" << 'PYEOF'
+from pathlib import Path
+root = Path.home() / ".codex" / "sessions"
+files = sorted(root.rglob("rollout-*.jsonl"), key=lambda p: p.stat().st_mtime)
+if files:
+    print(files[-1])
+PYEOF
+)
+    fi
+
+    if [ -z "$JSONL_LIST" ]; then
+      echo "No Codex JSONL files found on the pod."
+      echo "  searched: \$HOME/.codex/sessions"
+      if [ -n "$ROLLOUT_ID" ]; then
+        echo "  rollout id from session: $ROLLOUT_ID"
+      fi
+      echo "  latest rollout on pod: none"
+    else
+      echo "Found latest rollout:"
+      echo "$JSONL_LIST"
+      echo ""
+      UPLOADED=0
+      while IFS= read -r JSONL_PATH; do
+        ssh_remote "export DOCENT_API_KEY='$DOCENT_API_KEY'; python3 '$RCT_DIR/upload_codex_to_docent.py' \
+          --path '$JSONL_PATH' \
+          --collection-name '$COLLECTION' \
+          --meta-sidecar /tmp/session_meta.json"
+        UPLOADED=$(( UPLOADED + 1 ))
+      done <<< "$JSONL_LIST"
+      echo "[$(ts)] Uploaded $UPLOADED rollout(s) to '$COLLECTION'."
+    fi
+  fi
 fi
 
 echo ""
