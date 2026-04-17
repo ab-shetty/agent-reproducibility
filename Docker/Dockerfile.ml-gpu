@@ -86,8 +86,8 @@ RUN useradd -m -u $UID -s /bin/bash $USERNAME \
 # ── Auto-start session on first interactive login ────────────
 # Works for both root (RunPod default) and researcher (local/Lambda)
 RUN BASHRC_SNIPPET='# Auto-start reproducibility session on first connect\nif [ -t 0 ] && [ ! -f /tmp/.rct_session_started ]; then\n    source /opt/rct/start-session.sh\nfi' \
-    && echo -e "\n$BASHRC_SNIPPET" >> /root/.bashrc \
-    && echo -e "\n$BASHRC_SNIPPET" >> /home/$USERNAME/.bashrc
+    && printf '%b\n' "\n$BASHRC_SNIPPET" >> /root/.bashrc \
+    && printf '%b\n' "\n$BASHRC_SNIPPET" >> /home/$USERNAME/.bashrc
 
 WORKDIR /workspace
 RUN conda init bash \

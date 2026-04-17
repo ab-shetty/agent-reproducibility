@@ -29,16 +29,55 @@ if [ "$CONDITION" = "manual" ] && [ -n "$RCT_SESSION_REC" ] && [ -f "$RCT_SESSIO
         echo "--- SESSION RECORDING ---"
         python3 - "$RCT_SESSION_REC" << 'PYEOF'
 import sys, re
+
 raw = open(sys.argv[1], 'rb').read().decode('utf-8', errors='replace')
-# Strip OSC sequences (window titles, colour changes)
+
+# 1. Strip OSC sequences (window titles, colour changes)
 clean = re.sub(r'\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)', '', raw)
-# Strip CSI and other escape sequences
+# 2. Strip CSI and other ANSI escape sequences
 clean = re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', clean)
-# Strip remaining control characters except newline and tab
-clean = re.sub(r'[\x00-\x08\x0b-\x1f\x7f]', '', clean)
+
+# 3. Replay backspaces (\b) and carriage returns (\r) through a
+#    character-cell line buffer so the output contains the final text
+#    the user saw on screen (i.e. corrected commands, not raw keystrokes).
+lines = []
+buf = []   # current line as list of single characters
+col = 0    # cursor column within buf
+
+for ch in clean:
+    if ch == '\n':
+        lines.append(''.join(buf).rstrip())
+        buf = []
+        col = 0
+    elif ch == '\r':
+        col = 0
+    elif ch in ('\b', '\x7f'):
+        if col > 0:
+            col -= 1
+    elif ch == '\t':
+        target = (col + 8) & ~7
+        while col < target:
+            if col < len(buf):
+                col += 1
+            else:
+                buf.append(' ')
+                col += 1
+    elif ord(ch) >= 32:
+        if col < len(buf):
+            buf[col] = ch
+        else:
+            while len(buf) < col:
+                buf.append(' ')
+            buf.append(ch)
+        col += 1
+
+if buf:
+    lines.append(''.join(buf).rstrip())
+
+result = '\n'.join(lines)
 # Clean up prompt title remnants
-clean = re.sub(r'\d+;[^\n]*?[@:][^\n]*?[\$#] ', '', clean)
-print(clean, end='')
+result = re.sub(r'\d+;[^\n]*?[@:][^\n]*?[\$#] ', '', result)
+print(result, end='')
 PYEOF
     } >> "$RCT_MASTER_LOG"
 fi
