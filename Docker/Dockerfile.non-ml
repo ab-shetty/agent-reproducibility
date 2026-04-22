@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
     libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
     liblapack-dev libopenblas-dev \
-    libuv1-dev libnlopt-dev \
+    libuv1-dev libnlopt-dev libwebp-dev \
     # Sudo for runtime installs
     sudo \
     && rm -rf /var/lib/apt/lists/*
