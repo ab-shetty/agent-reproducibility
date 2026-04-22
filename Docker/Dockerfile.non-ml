@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl git vim nano less \
     ca-certificates gnupg software-properties-common \
     # Build tools
-    build-essential gcc g++ make gfortran \
+    build-essential gcc g++ make cmake gfortran \
     # Compression / archive
     zip unzip tar \
     # R runtime dependencies
