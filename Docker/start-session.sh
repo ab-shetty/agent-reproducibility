@@ -121,6 +121,9 @@ echo ""
 
 if [ "$CONDITION" = "ai-assisted" ]; then
     echo "Hints:"
+    echo "- To upload the paper from your local machine, use"
+    echo "  runpodctl send paper.pdf"
+    echo "To launch Codex, use"
     echo "  codex --dangerously-bypass-approvals-and-sandbox"
     echo ""
 fi
